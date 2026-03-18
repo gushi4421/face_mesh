@@ -10,3 +10,15 @@ logging:
     
     # 日志文件编码
     encoding: "utf-8"
+
+face-mesh:
+    # 
+    width: 640
+
+    height: 480
+
+    print_landmarks: false
+
+    model_path: "face_landmarker.task"
+
+    maxfaces: 2

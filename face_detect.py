@@ -3,6 +3,14 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
+from pathlib import Path
+import sys
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from log import logger
 
 
 class FaceMeshDetector:
@@ -18,6 +26,7 @@ class FaceMeshDetector:
         self.model_path = model_path
         self.maxFaces = maxFaces
         self.landmarker = self._get_landmarker()
+        logger.info("人脸网格检测器被创建")
 
     def _get_landmarker(self):
         """获取人脸检测器"""
@@ -31,27 +40,27 @@ class FaceMeshDetector:
         landmarker = vision.FaceLandmarker.create_from_options(options)
         return landmarker
 
-    def find_face_mesh(self, img, draw: bool):
+    def find_face_mesh(self, frame, draw: bool):
         """
         在一帧图像中寻找人脸网格，并手动绘制它们
         img: 输入的图片(格式为BGR)
         draw: 是否绘制网络
         """
         # 将 BGR 格式转变为 RGB
-        img_RGB = cv.cvtColor(img, cv.COLOR_BGR2RGB)
+        frame_RGB = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         # 将 NumPy 数组转换为 MediaPipe 图像格式
-        mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_RGB)
+        mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_RGB)
         # 使用人脸检测器进行检测
         detection_result = self.landmarker.detect(mp_img)
 
-        processed_img = img.copy()
-        skeleton_img = np.zeros(img.shape, np.uint8)
+        processed_frame = frame.copy()
+        skeleton_img = np.zeros(frame.shape, np.uint8)
 
         if detection_result.face_landmarks and draw:
             for face_landmarks in detection_result.face_landmarks:
                 for (
                     connection
-                ) in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATTON:
+                ) in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION:
                     start_index = connection.start
                     end_index = connection.end
 
@@ -60,7 +69,7 @@ class FaceMeshDetector:
                     ):
                         start_landmark = face_landmarks[start_index]
                         end_landmark = face_landmarks[end_index]
-                        h, w, _ = img.shape
+                        h, w, _ = frame.shape
                         start_point = (
                             int(start_landmark.x * w),
                             int(start_landmark.y * h),
@@ -87,17 +96,17 @@ class FaceMeshDetector:
                             thickness=1,
                         )
                         cv.line(
-                            img=processed_img,
+                            img=processed_frame,
                             pt1=start_point,
                             pt2=end_point,
                             color=(0, 255, 0),
                             thickness=1,
                         )
                 for landmark in face_landmarks:
-                    h, w, _ = img.shape
+                    h, w, _ = frame.shape
                     x, y = int(landmark.x * w), int(landmark.y * h)
                     cv.circle(
-                        img=processed_img,
+                        img=processed_frame,
                         center=(x, y),
                         radius=1,
                         color=(0, 0, 255),
@@ -110,7 +119,7 @@ class FaceMeshDetector:
                         color=(0, 0, 255),
                         thickness=-1,
                     )
-        return processed_img, skeleton_img, detection_result.face_landmarks
+        return processed_frame, skeleton_img, detection_result.face_landmarks
 
     def img_combine(self, img1, img2):
         """水平拼接两个图像"""
@@ -127,4 +136,5 @@ class FaceMeshDetector:
             dst = np.zeros((max(h1, h2), w1 + w2), np.uint8)
             dst[:, :w1] = img1
             dst[:, w1:] = img2
+
         return dst
