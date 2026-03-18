@@ -1,0 +1,12 @@
+logging:
+    # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
+    level: "INFO"
+    
+    # 日志文件路径
+    path: "records.log"
+    
+    # 日志格式
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
+    # 日志文件编码
+    encoding: "utf-8"
