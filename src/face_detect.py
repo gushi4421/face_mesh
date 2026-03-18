@@ -6,27 +6,43 @@ import numpy as np
 from pathlib import Path
 import sys
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.append(str(PROJECT_ROOT))
-
-from log import logger
+from src.log import logger
 
 
 class FaceMeshDetector:
     def __init__(
         self,
         model_path: str,
-        maxFaces: int,
+        max_faces: int,
     ):
         """
         model_path: 模型文件路径
-        maxFaces: 最大人脸数
+        max_faces: 最大人脸数
         """
+        model_file = Path(model_path)
+        if not model_file.exists():
+            raise FileNotFoundError(f"模型文件不存在: {model_file.resolve()}")
+        if not model_file.is_file():
+            raise ValueError(f"模型路径不是文件: {model_file.resolve()}")
+
         self.model_path = model_path
-        self.maxFaces = maxFaces
+        self.max_faces = max_faces
         self.landmarker = self._get_landmarker()
         logger.info("人脸网格检测器被创建")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+    def close(self):
+        """释放 MediaPipe 资源"""
+        if self.landmarker:
+            self.landmarker.close()
+            self.landmarker = None
+            logger.info("人脸网格检测器资源已释放")
 
     def _get_landmarker(self):
         """获取人脸检测器"""
@@ -35,26 +51,34 @@ class FaceMeshDetector:
         )  # 创建基础配置
         options = vision.FaceLandmarkerOptions(
             base_options=base_options,  # 基础配置
-            num_faces=self.maxFaces,  # 最大识别人脸数
+            num_faces=self.max_faces,  # 最大识别人脸数
         )
         landmarker = vision.FaceLandmarker.create_from_options(options)
         return landmarker
 
-    def find_face_mesh(self, frame, draw: bool):
+    def find_face_mesh(self, frame, draw: bool = True):
         """
         在一帧图像中寻找人脸网格，并手动绘制它们
         img: 输入的图片(格式为BGR)
         draw: 是否绘制网络
         """
         # 将 BGR 格式转变为 RGB
-        frame_RGB = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         # 将 NumPy 数组转换为 MediaPipe 图像格式
-        mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_RGB)
+        mediapipe_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         # 使用人脸检测器进行检测
-        detection_result = self.landmarker.detect(mp_img)
+        detection_result = self.landmarker.detect(mediapipe_img)
 
+        if not draw:
+            return (
+                frame,
+                np.zeros(frame.shape, np.uint8),
+                detection_result.face_landmarks,
+            )
+
+        frame_shape = frame.shape
         processed_frame = frame.copy()
-        skeleton_img = np.zeros(frame.shape, np.uint8)
+        skeleton_img = np.zeros(frame_shape, np.uint8)
 
         if detection_result.face_landmarks and draw:
             for face_landmarks in detection_result.face_landmarks:
@@ -69,7 +93,7 @@ class FaceMeshDetector:
                     ):
                         start_landmark = face_landmarks[start_index]
                         end_landmark = face_landmarks[end_index]
-                        h, w, _ = frame.shape
+                        h, w, _ = frame_shape
                         start_point = (
                             int(start_landmark.x * w),
                             int(start_landmark.y * h),
@@ -79,21 +103,12 @@ class FaceMeshDetector:
                             int(end_landmark.y * h),
                         )
 
-                        """
-                        cv.line参数解析
-                            img: 要绘制的图像
-                            pt1: 线段的起点坐标 (x, y)
-                            pt2: 线段的终点坐标 (x, y)
-                            color: 线段的颜色 (B, G, R)
-                            thickness: 线段的粗细 (以像素为单位)
-                        """
-
                         cv.line(
-                            img=skeleton_img,
-                            pt1=start_point,
-                            pt2=end_point,
-                            color=(0, 255, 0),
-                            thickness=1,
+                            img=skeleton_img,  # 绘制骨架图像
+                            pt1=start_point,  # 线段起点
+                            pt2=end_point,  # 线段终点
+                            color=(0, 255, 0),  # 线段颜色 (B, G, R)
+                            thickness=1,  # 线段粗细
                         )
                         cv.line(
                             img=processed_frame,
@@ -103,7 +118,7 @@ class FaceMeshDetector:
                             thickness=1,
                         )
                 for landmark in face_landmarks:
-                    h, w, _ = frame.shape
+                    h, w, _ = frame_shape
                     x, y = int(landmark.x * w), int(landmark.y * h)
                     cv.circle(
                         img=processed_frame,
@@ -123,18 +138,16 @@ class FaceMeshDetector:
 
     def img_combine(self, img1, img2):
         """水平拼接两个图像"""
-        if len(img1.shape) == 3:
-            h1, w1 = img1.shape[:2]
-            h2, w2 = img2.shape[:2]
-            dst = np.zeros((max(h1, h2), w1 + w2, 3), np.uint8)
-            dst[:, :w1] = img1
-            dst[:, w1:] = img2
-        else:
-            img2 = cv.cvtColor(img2, cv.COLOR_BGR2GRAY)
-            h1, w1 = img1.shape[:2]
-            h2, w2 = img2.shape[:2]
-            dst = np.zeros((max(h1, h2), w1 + w2), np.uint8)
-            dst[:, :w1] = img1
-            dst[:, w1:] = img2
+        # 当两图高度相同时，直接使用 hstack（本项目中始终成立）
+        if img1.shape[0] == img2.shape[0]:
+            return np.hstack((img1, img2))
 
-        return dst
+        # 高度不同时，对齐到最大高度
+        max_h = max(img1.shape[0], img2.shape[0])
+        pad1 = np.zeros(
+            (max_h - img1.shape[0], img1.shape[1], *img1.shape[2:]), np.uint8
+        )
+        pad2 = np.zeros(
+            (max_h - img2.shape[0], img2.shape[1], *img2.shape[2:]), np.uint8
+        )
+        return np.hstack((np.vstack((img1, pad1)), np.vstack((img2, pad2))))
