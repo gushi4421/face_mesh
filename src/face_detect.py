@@ -56,20 +56,14 @@ class FaceMeshDetector:
         landmarker = vision.FaceLandmarker.create_from_options(options)
         return landmarker
 
-    def find_face_mesh(self, frame, draw: bool = True, draw_tesselation: bool = True, draw_landmarks: bool = True):
+    def find_face_mesh(self, frame, draw: bool = True, left_draw_mode: str = "mesh"):
         """
-        在一帧图像中寻找人脸网格, 并支持动态控制绘制方式.
-        
+        在一帧图像中寻找人脸网格, 并支持左侧图像模式的二选一.
+
         Args:
             frame: 输入的 BGR 格式图像.
-            draw: 是否进行任何可视化绘制的全局开关.
-            draw_tesselation: 是否绘制面部特征点之间的网格连线.
-            draw_landmarks: 是否绘制面部的独立特征点 (红色散点).
-            
-        Returns:
-            processed_frame: 绘制了特征点的原图.
-            skeleton_img: 仅包含特征点(及连线)的纯黑底图像.
-            face_landmarks: 检测到的原始特征点数据.
+            draw: 全局可视化开关.
+            left_draw_mode: 左侧原图的绘制模式 ("mesh" 为连线, "points" 为特征点).
         """
         frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         mediapipe_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
@@ -88,36 +82,64 @@ class FaceMeshDetector:
 
         if detection_result.face_landmarks and draw:
             for face_landmarks in detection_result.face_landmarks:
-                
-                # 判断是否需要绘制网格连线
-                if draw_tesselation:
-                    for connection in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION:
-                        start_index = connection.start
-                        end_index = connection.end
 
-                        if start_index < len(face_landmarks) and end_index < len(face_landmarks):
-                            start_landmark = face_landmarks[start_index]
-                            end_landmark = face_landmarks[end_index]
-                            h, w, _ = frame_shape
-                            start_point = (
-                                int(start_landmark.x * w),
-                                int(start_landmark.y * h),
-                            )
-                            end_point = (
-                                int(end_landmark.x * w),
-                                int(end_landmark.y * h),
-                            )
+                # 步骤一: 优先绘制所有的网格连线 (作为底层)
+                for (
+                    connection
+                ) in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION:
+                    start_index = connection.start
+                    end_index = connection.end
 
-                            cv.line(img=skeleton_img, pt1=start_point, pt2=end_point, color=(0, 255, 0), thickness=1)
-                            cv.line(img=processed_frame, pt1=start_point, pt2=end_point, color=(0, 255, 0), thickness=1)
-                            
-                # 核心逻辑: 新增条件判断, 仅当 draw_landmarks 为 True 时才绘制特征点
-                if draw_landmarks:
-                    for landmark in face_landmarks:
+                    if start_index < len(face_landmarks) and end_index < len(
+                        face_landmarks
+                    ):
+                        start_landmark = face_landmarks[start_index]
+                        end_landmark = face_landmarks[end_index]
                         h, w, _ = frame_shape
-                        x, y = int(landmark.x * w), int(landmark.y * h)
-                        
-                        # 绘制处理后原图上的红点
+                        start_point = (
+                            int(start_landmark.x * w),
+                            int(start_landmark.y * h),
+                        )
+                        end_point = (
+                            int(end_landmark.x * w),
+                            int(end_landmark.y * h),
+                        )
+
+                        # 右侧骨架图: 始终无条件绘制绿色连线
+                        cv.line(
+                            img=skeleton_img,
+                            pt1=start_point,
+                            pt2=end_point,
+                            color=(0, 255, 0),
+                            thickness=1,
+                        )
+
+                        # 左侧原图: 仅当模式为 mesh 时才绘制连线
+                        if left_draw_mode == "mesh":
+                            cv.line(
+                                img=processed_frame,
+                                pt1=start_point,
+                                pt2=end_point,
+                                color=(0, 255, 0),
+                                thickness=1,
+                            )
+
+                # 步骤二: 随后绘制所有的特征点 (作为表层, 防止被绿线覆盖)
+                for landmark in face_landmarks:
+                    h, w, _ = frame_shape
+                    x, y = int(landmark.x * w), int(landmark.y * h)
+
+                    # 右侧骨架图: 始终无条件绘制红色特征点, 并且将半径调至 2, 确保在绿线上方清晰可见
+                    cv.circle(
+                        img=skeleton_img,
+                        center=(x, y),
+                        radius=2,
+                        color=(0, 0, 255),
+                        thickness=-1,
+                    )
+
+                    # 左侧原图: 仅当模式为 points 时才绘制特征点
+                    if left_draw_mode == "points":
                         cv.circle(
                             img=processed_frame,
                             center=(x, y),
@@ -125,16 +147,9 @@ class FaceMeshDetector:
                             color=(0, 0, 255),
                             thickness=-1,
                         )
-                        # 绘制纯黑背景骨架图上的红点
-                        cv.circle(
-                            img=skeleton_img,
-                            center=(x, y),
-                            radius=1,
-                            color=(0, 0, 255),
-                            thickness=-1,
-                        )
-                    
+
         return processed_frame, skeleton_img, detection_result.face_landmarks
+
     def img_combine(self, img1, img2):
         """水平拼接两个图像"""
         # 当两图高度相同时，直接使用 hstack（本项目中始终成立）

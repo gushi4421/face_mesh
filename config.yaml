@@ -17,7 +17,7 @@ face-mesh:
     model_path: "models/face_landmarker.task"
     initial_max_faces: 2
     initial_draw_tesselation: true
-    initial_draw_landmarks: true
+    left_draw_mode: "mesh"
 
 beauty:
     initial_saturation: 1.0

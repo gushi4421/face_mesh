@@ -38,10 +38,7 @@ class VideoThread(QThread):
 
         self.max_faces = config["face-mesh"]["initial_max_faces"]
         # 读取初始的连线状态配置
-        self.draw_tesselation = config["face-mesh"].get(
-            "initial_draw_tesselation", True
-        )
-        self.draw_landmarks = config["face-mesh"].get("initial_draw_landmarks", True)
+        self.left_draw_mode = config["face-mesh"].get("left_draw_mode", "mesh")
         self.saturation = config["beauty"]["initial_saturation"]
         self.sharpness = config["beauty"]["initial_sharpness"]
         self.smoothing = config["beauty"]["initial_smoothing"]
@@ -54,10 +51,8 @@ class VideoThread(QThread):
         if "max_faces" in params_dict:
             self.max_faces = params_dict["max_faces"]
         # 新增对网格连线状态的解析
-        if "draw_tesselation" in params_dict:
-            self.draw_tesselation = params_dict["draw_tesselation"]
-        if "draw_landmarks" in params_dict:
-            self.draw_landmarks = params_dict["draw_landmarks"]
+        if "left_draw_mode" in params_dict:
+            self.left_draw_mode = params_dict["left_draw_mode"]
         if "saturation" in params_dict:
             self.saturation = params_dict["saturation"]
         if "sharpness" in params_dict:
@@ -95,8 +90,7 @@ class VideoThread(QThread):
                     processed_frame, skeleton_img, _ = detector.find_face_mesh(
                         frame=beauty_frame,
                         draw=True,
-                        draw_tesselation=self.draw_tesselation,
-                        draw_landmarks=self.draw_landmarks,
+                        left_draw_mode=self.left_draw_mode,
                     )
 
                     dst = detector.img_combine(processed_frame, skeleton_img)
@@ -132,20 +126,21 @@ class ParameterPanel(QWidget):
         )
         self.max_faces_combo.currentTextChanged.connect(self.on_parameter_changed)
 
-        self.draw_tesselation_checkbox = QCheckBox("绘制面部网格连线")
-        self.draw_tesselation_checkbox.setChecked(
-            config["face-mesh"].get("initial_draw_tesselation", True)
+        self.draw_mode_combo = QComboBox()
+        self.draw_mode_combo.addItems(["绘制面部网络连接", "在人脸上绘制特征点"])
+        self.draw_mode_combo.setCurrentText(
+            "绘制面部网络连接"
+            if config["face-mesh"].get("initial_draw_tesselation", True)
+            else "在人脸上绘制特征点"
         )
-        self.draw_tesselation_checkbox.stateChanged.connect(self.on_parameter_changed)
 
-        # 新增: 控制特征点散点绘制的复选框控件
-        self.draw_landmarks_checkbox = QCheckBox("绘制面部特征点 (红点)")
-        self.draw_landmarks_checkbox.setChecked(
-            config["face-mesh"].get("initial_draw_landmarks", True)
-        )
-        self.draw_landmarks_checkbox.stateChanged.connect(self.on_parameter_changed)
-        # 核心逻辑: 当复选框状态改变时, 触发全局数据收集
-        self.draw_tesselation_checkbox.stateChanged.connect(self.on_parameter_changed)
+        init_mode = config["face-mesh"].get("left_draw_mode", "mesh")
+        if init_mode == "points":
+            self.draw_mode_combo.setCurrentText("在人脸上绘制特征点")
+        else:
+            self.draw_mode_combo.setCurrentText("绘制面部网络连接")
+        self.draw_mode_combo.currentTextChanged.connect(self.on_parameter_changed)
+
         # 2. 饱和度调节滑块
         self.sat_slider = QSlider(Qt.Horizontal)
         self.sat_slider.setRange(0, 20)
@@ -177,12 +172,11 @@ class ParameterPanel(QWidget):
         self.bright_slider.valueChanged.connect(self.update_bright_label_and_emit)
 
         self.layout.addRow("最大识别脸数:", self.max_faces_combo)
+        self.layout.addRow("左侧原图显示:", self.draw_mode_combo)
         self.layout.addRow(self.sat_label, self.sat_slider)
         self.layout.addRow(self.sharp_label, self.sharp_slider)
         self.layout.addRow(self.smooth_label, self.smooth_slider)
         self.layout.addRow(self.bright_label, self.bright_slider)
-        self.layout.addRow(self.draw_tesselation_checkbox)
-        self.layout.addRow(self.draw_landmarks_checkbox)
 
     def update_sat_label_and_emit(self, value: int):
         """
@@ -214,16 +208,17 @@ class ParameterPanel(QWidget):
         self.on_parameter_changed()
 
     def on_parameter_changed(self):
-        """
-        集中收集所有组件的数值, 打包为字典发送.
-        """
+        """集中收集所有组件的数值, 打包为字典发送."""
+        # 解析下拉菜单的中文选项，映射为内部的英文模式控制符
+        mode_text = self.draw_mode_combo.currentText()
+        draw_mode = "points" if mode_text == "在人脸上绘制特征点" else "mesh"
+
         params = {
             "max_faces": int(self.max_faces_combo.currentText()),
-            "draw_tesselation": self.draw_tesselation_checkbox.isChecked(),
+            "left_draw_mode": draw_mode,
             "saturation": self.sat_slider.value() / 10.0,
             "sharpness": self.sharp_slider.value() / 10.0,
             "smoothing": self.smooth_slider.value(),
             "brighten": self.bright_slider.value() / 10.0,
-            "draw_landmarks": self.draw_landmarks_checkbox.isChecked(),
         }
         self.sig_parameters_changed.emit(params)
