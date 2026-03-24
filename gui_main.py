@@ -1,6 +1,6 @@
 """
 文件级注释: 本文件是 GUI 应用的主入口点.
-集成了安全的 BackgroundWidget 容器, 以及 QGraphicsOpacityEffect 视频透视特效.
+集成了 BackgroundWidget 容器, 以及解决防漏光黑底问题的 QSS 全局样式表.
 """
 
 import sys
@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QGroupBox,
-    QGraphicsOpacityEffect,
 )
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt, QSize
@@ -28,7 +27,8 @@ from src.ui_style import BackgroundWidget
 
 class MainWindow(QMainWindow):
     """
-    类级注释: MainWindow 负责拦截样式参数并应用到前端组件.
+    类级注释: 主窗口控制器.
+    负责界面的宏观布局排版以及跨组件的信号路由转发.
     """
 
     def __init__(self, config: dict):
@@ -44,8 +44,72 @@ class MainWindow(QMainWindow):
         self.thread = VideoThread(config)
         self.init_ui(gui_config, full_config=config)
 
+    def apply_stylesheet(self):
+        """
+        方法级注释: 应用 Qt Style Sheets (QSS) 美化界面.
+        核心逻辑: 精确设置 ID 选择器, 确保视频区域显示为纯黑, 控制台显示为半透明暗色.
+        """
+        qss = """
+        /* 基础 GroupBox 样式 */
+        QGroupBox {
+            border: 1px solid rgba(255, 255, 255, 60);
+            border-radius: 10px;
+            margin-top: 20px;
+            color: #FFFFFF;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        /* 仅给右侧的控制台加上半透明暗色底漆 */
+        QGroupBox#paramGroup {
+            background-color: rgba(20, 20, 20, 180);
+        }
+        
+        QGroupBox#videoGroup {
+            background-color: transparent;
+        }
+        
+        /* 核心修改1: 将视频控件的背景恢复为全透明, 去除上下的巨大黑边 */
+        QGroupBox#videoGroup QLabel {
+            background-color: transparent; 
+            border-radius: 5px;
+        }
+
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center;
+            padding: 0 10px;
+            color: #FFFFFF;
+        }
+
+        QLabel, QCheckBox {
+            color: #FFFFFF;
+            background: transparent;
+            font-size: 15px;
+        }
+
+        QPushButton, QComboBox {
+            background-color: rgba(60, 60, 60, 200);
+            color: #FFFFFF;
+            border: 1px solid #555555;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 15px;
+        }
+
+        QPushButton:hover {
+            background-color: rgba(90, 90, 90, 220);
+            border: 1px solid #888888;
+        }
+
+        QPushButton:disabled {
+            background-color: rgba(40, 40, 40, 100);
+            color: #888888;
+        }
+        """
+        self.setStyleSheet(qss)
+
     def init_ui(self, gui_config: dict, full_config: dict):
-        # 核心逻辑: 注入我们封装的带安全检测的底层容器
         self.central_widget = BackgroundWidget(self)
         self.setCentralWidget(self.central_widget)
         self.central_widget.set_background_image(self.bg_image_path)
@@ -53,10 +117,12 @@ class MainWindow(QMainWindow):
 
         self.main_h_layout = QHBoxLayout(self.central_widget)
 
+        # ---------------- 左侧视频区 ----------------
         self.left_layout = QVBoxLayout()
         self.main_h_layout.addLayout(self.left_layout, 4)
 
         self.video_group = QGroupBox("实时监控 (带全套美颜处理)")
+        self.video_group.setObjectName("videoGroup")
         self.video_layout = QVBoxLayout()
         self.video_group.setLayout(self.video_layout)
 
@@ -64,12 +130,6 @@ class MainWindow(QMainWindow):
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setText(self.initial_text)
         self.video_label.setMinimumSize(QSize(640, 480))
-
-        # 核心魔法逻辑: 给视频控件挂载透明度特效组件
-        # 这样即使视频正在播放, 也能透出背后的全局图片
-        self.video_opacity_effect = QGraphicsOpacityEffect(self.video_label)
-        self.video_label.setGraphicsEffect(self.video_opacity_effect)
-        self.video_opacity_effect.setOpacity(gui_config.get("video_opacity", 0.85))
 
         self.video_layout.addWidget(self.video_label)
         self.left_layout.addWidget(self.video_group)
@@ -85,10 +145,12 @@ class MainWindow(QMainWindow):
         self.btn_layout.addWidget(self.stop_btn)
         self.left_layout.addLayout(self.btn_layout)
 
+        # ---------------- 右侧控制台 ----------------
         self.right_layout = QVBoxLayout()
         self.main_h_layout.addLayout(self.right_layout, 1)
 
         self.param_group = QGroupBox("控制台")
+        self.param_group.setObjectName("paramGroup")
         self.param_layout = QVBoxLayout()
         self.param_group.setLayout(self.param_layout)
 
@@ -99,28 +161,44 @@ class MainWindow(QMainWindow):
         self.right_layout.addWidget(self.param_group)
         self.right_layout.addStretch()
 
+        # 加载样式表以应用 ID 隔离规则
+        self.apply_stylesheet()
+
     def start_video(self):
         self.thread.change_pixmap_signal.connect(self.update_image)
         self.thread.start()
         self.start_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
-        # 清除待机占位文字
         self.video_label.setText("")
 
     def stop_video(self):
         self.thread.stop()
         self.start_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
-        # 恢复占位文字并清空视频画面, 以免残留最后一帧
         self.video_label.clear()
         self.video_label.setText(self.initial_text)
 
     def update_image(self, cv_img):
-        rgb_image = cv.cvtColor(cv_img, cv.COLOR_BGR2RGB)
-        h, w, ch = rgb_image.shape
+        """
+        方法级注释: 接收并渲染 OpenCV 图像.
+        核心修改2: 动态判断图像通道数, 完美兼容 4 通道 RGBA 图像渲染.
+        """
+        h, w, ch = cv_img.shape
         bytes_per_line = ch * w
 
-        qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        if ch == 4:
+            # 如果底层传来了带透明通道的 BGRA 图像
+            rgba_image = cv.cvtColor(cv_img, cv.COLOR_BGRA2RGBA)
+            qt_image = QImage(
+                rgba_image.data, w, h, bytes_per_line, QImage.Format_RGBA8888
+            )
+        else:
+            # 如果是普通的 3 通道图像
+            rgb_image = cv.cvtColor(cv_img, cv.COLOR_BGR2RGB)
+            qt_image = QImage(
+                rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888
+            )
+
         self.video_label.setPixmap(
             QPixmap.fromImage(qt_image).scaled(
                 self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
@@ -128,25 +206,15 @@ class MainWindow(QMainWindow):
         )
 
     def on_params_updated(self, params_dict: dict):
-        """
-        方法级注释: 拦截 UI 样式参数并实时渲染, 将业务参数放行给子线程.
-        """
-        # 拦截并更新背景图片路径
         if "bg_image_path" in params_dict:
             new_path = params_dict["bg_image_path"]
             if new_path != self.bg_image_path:
                 self.bg_image_path = new_path
                 self.central_widget.set_background_image(self.bg_image_path)
 
-        # 拦截并更新背景图片的透明度
         if "bg_opacity" in params_dict:
             self.central_widget.set_background_opacity(params_dict["bg_opacity"])
 
-        # 拦截并更新视频画面的透视度
-        if "video_opacity" in params_dict:
-            self.video_opacity_effect.setOpacity(params_dict["video_opacity"])
-
-        # 将与面部算法及美颜相关的参数传递给视频线程
         self.thread.update_parameters(params_dict)
 
     def closeEvent(self, event):

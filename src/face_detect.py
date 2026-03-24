@@ -63,33 +63,53 @@ class FaceMeshDetector:
         draw_on_left: bool = True,
     ):
         """
-        在一帧图像中寻找人脸网格, 并支持左侧图像模式的二选一.
-
-        Args:
-            frame: 输入的 BGR 格式图像.
-            draw: 全局可视化开关.
-            draw_mode: 绘制模式 ("mesh" 为连线, "points" 为特征点).
-            draw_on_left: 是否在左侧原图上绘制.
+        方法级注释: 在一帧图像中寻找人脸网格.
+        核心修改: 引入 4 通道 (RGBA) 图像处理, 恢复右侧实体黑块, 并为左右画面绘制悬浮边框.
         """
         frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         mediapipe_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         detection_result = self.landmarker.detect(mediapipe_img)
 
-        if not draw:
-            return (
-                frame,
-                np.zeros(frame.shape, np.uint8),
-                detection_result.face_landmarks,
-            )
-
         frame_shape = frame.shape
-        processed_frame = frame.copy()
-        skeleton_img = np.zeros(frame_shape, np.uint8)
+
+        # 1. 左侧画面: 将实拍原图转换为 4 通道 (BGRA)
+        processed_frame = cv.cvtColor(frame.copy(), cv.COLOR_BGR2BGRA)
+
+        # 2. 右侧画面: 创建一个 4 通道的全零矩阵
+        skeleton_img = np.zeros((frame_shape[0], frame_shape[1], 4), np.uint8)
+
+        # 核心修改 A：将右侧矩阵的 Alpha (透明度) 通道全部设为 255
+        # 这会让右侧的画布重新变成“百分百实体”的黑块, 而不再是透明的
+        skeleton_img[:, :, 3] = 255
+
+        # 核心修改 B：为左右两个画面绘制高亮边框
+        # 颜色格式为 (B, G, R, Alpha), 这里使用纯白色实体边框
+        border_color = (255, 255, 255, 255)
+        thickness = 2
+        # 给左侧摄像头画面画边框
+        cv.rectangle(
+            processed_frame,
+            (0, 0),
+            (frame_shape[1] - 1, frame_shape[0] - 1),
+            border_color,
+            thickness,
+        )
+        # 给右侧实体黑块画边框
+        cv.rectangle(
+            skeleton_img,
+            (0, 0),
+            (frame_shape[1] - 1, frame_shape[0] - 1),
+            border_color,
+            thickness,
+        )
+
+        if not draw:
+            return processed_frame, skeleton_img, detection_result.face_landmarks
 
         if detection_result.face_landmarks and draw:
             for face_landmarks in detection_result.face_landmarks:
 
-                # 核心逻辑: 当全局模式为绘制网格连接时
+                # 绘制网格模式
                 if draw_mode == "mesh":
                     for (
                         connection
@@ -112,47 +132,43 @@ class FaceMeshDetector:
                                 int(end_landmark.y * h),
                             )
 
-                            # 右侧基准图: 始终无条件绘制绿色连线
+                            # 画笔颜色加入第 4 个参数 255, 确保线条本身也是不透明的
                             cv.line(
                                 img=skeleton_img,
                                 pt1=start_point,
                                 pt2=end_point,
-                                color=(0, 255, 0),
+                                color=(0, 255, 0, 255),
                                 thickness=1,
                             )
-
-                            # 左侧原图: 仅当左侧开关开启时才绘制连线
                             if draw_on_left:
                                 cv.line(
                                     img=processed_frame,
                                     pt1=start_point,
                                     pt2=end_point,
-                                    color=(0, 255, 0),
+                                    color=(0, 255, 0, 255),
                                     thickness=1,
                                 )
 
-                # 核心逻辑: 当全局模式为绘制特征点时
+                # 绘制特征散点模式
                 elif draw_mode == "points":
                     for landmark in face_landmarks:
                         h, w, _ = frame_shape
                         x, y = int(landmark.x * w), int(landmark.y * h)
 
-                        # 右侧基准图: 始终无条件绘制红色特征点 (为了可视性略微放大半径)
+                        # 同理, 红色散点也加入 Alpha 通道参数 255
                         cv.circle(
                             img=skeleton_img,
                             center=(x, y),
                             radius=2,
-                            color=(0, 0, 255),
+                            color=(0, 0, 255, 255),
                             thickness=-1,
                         )
-
-                        # 左侧原图: 仅当左侧开关开启时才绘制特征点
                         if draw_on_left:
                             cv.circle(
                                 img=processed_frame,
                                 center=(x, y),
                                 radius=1,
-                                color=(0, 0, 255),
+                                color=(0, 0, 255, 255),
                                 thickness=-1,
                             )
 
