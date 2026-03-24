@@ -67,6 +67,18 @@ face_mesh_pro/
     └── logger.py          # 全局日志记录
 ```
 ## 🚀 快速开始
+
+#### 📥 下载与安装 (开箱即用)
+
+如果你不想配置 Python 环境，可以直接下载我们预编译好的独立运行程序（目前支持 Windows）。
+
+[![Download for Windows](https://img.shields.io/badge/Download-FaceMeshPro_v1.0_Windows.zip-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/gushi4421/face_mesh/releases)
+
+> **💡 提示**: 
+> 1. 点击上方按钮进入 Releases 页面下载最新版本的 `.zip` 压缩包。
+> 2. 解压后，**请确保** `FaceMeshPro.exe` 与 `models/` 文件夹及 `config.yaml` 位于同一目录下。
+> 3. 双击 `FaceMeshPro.exe` 即可直接体验全息美颜系统！
+> 
 - **1.环境配置**
 建议使用 Python 3.8 或更高版本的虚拟环境进行安装与测试。
 ```bash
@@ -101,7 +113,7 @@ python app.py
 pip install pyinstaller
 
 # 执行打包命令 (-D 生成目录模式，-w 隐藏控制台，指定应用名称)
-pyinstaller -D -w app.py --name "FaceMeshPro"
+pyinstaller -D -w app.py --name "FaceMesh"
 ```
 ## 👤 作者
 

@@ -1,6 +1,9 @@
 *.log
 *.pyc
-*.task
 .vscode/
 .venv/
 *.png
+.gitignore
+dist/
+build/
+*.spec
