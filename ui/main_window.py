@@ -58,7 +58,7 @@ class MainWindow(QMainWindow):
         main_layout = QHBoxLayout(self.bg_container)
 
         # 2. 左侧视频展示区
-        left_box = QGroupBox("实时监控 (带全套美颜处理)")
+        left_box = QGroupBox("实时监控")
         left_box.setObjectName("videoGroup")
         left_v = QVBoxLayout(left_box)
 
@@ -101,7 +101,7 @@ class MainWindow(QMainWindow):
             border-radius: 8px; 
             color: #FFFFFF; 
             font-weight: bold; 
-            font-size: 20px; /* 核心修改: 将标题字号放大至 20px */
+            font-size: 24px; /* 核心修改: 将标题字号放大至 24px */
             margin-top: 25px; /* 核心修改: 顶部留出足够的外边距, 防止大字号被裁切 */
         }
         
@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
         QGroupBox::title {
             subcontrol-origin: margin;
             subcontrol-position: top center; /* 绝对顶部居中对齐 */
-            padding: 0 15px; /* 左右增加内边距, 打断边框线, 让文字两端有呼吸感 */
+            padding: 0 16px; /* 左右增加内边距, 打断边框线, 让文字两端有呼吸感 */
             color: #FFFFFF;
         }
 
@@ -117,13 +117,13 @@ class MainWindow(QMainWindow):
         /* 关键: 确保视频区域 QLabel 背景透明, 以透出底层的背景图 */
         QGroupBox#videoGroup QLabel { background-color: transparent; }
         
-        QLabel, QCheckBox { color: #FFFFFF; font-size: 15px; }
+        QLabel, QCheckBox { color: #FFFFFF; font-size: 16px; }
         QPushButton, QComboBox { 
             background-color: rgba(60, 60, 60, 200); 
             color: #FFFFFF; 
-            padding: 8px; 
+            padding: 9px; 
             border-radius: 4px; 
-            font-size: 15px;
+            font-size: 16px;
         }
         QPushButton:hover { background-color: rgba(90, 90, 90, 220); }
         QPushButton:disabled { color: #888888; background-color: rgba(40, 40, 40, 100); }
