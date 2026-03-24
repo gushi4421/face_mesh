@@ -4,7 +4,6 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
 from pathlib import Path
-import sys
 
 from src.log import logger
 
