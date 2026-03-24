@@ -2,7 +2,12 @@ import logging
 import sys
 from pathlib import Path
 
-from tools.load_config import load_config
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+sys.path.append(str(PROJECT_ROOT))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT / "src"))
+
+from src.tools.load_config import load_config
 
 
 def setup_logging():
