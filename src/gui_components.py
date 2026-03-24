@@ -4,21 +4,11 @@
 """
 
 import cv2 as cv
+from networkx import draw
 import numpy as np
-from PyQt5.QtWidgets import QWidget, QFormLayout, QComboBox, QSlider, QLabel
-from PyQt5.QtCore import QThread, pyqtSignal, Qt
-
-from src.face_detect import FaceMeshDetector
-from src.tools.open import open_camera
-from src.filters import apply_beauty_filters
-
-
-import cv2 as cv
-import numpy as np
-
-# 新增导入 QCheckBox
 from PyQt5.QtWidgets import QWidget, QFormLayout, QComboBox, QSlider, QLabel, QCheckBox
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
+
 
 from src.face_detect import FaceMeshDetector
 from src.tools.open import open_camera
@@ -35,10 +25,10 @@ class VideoThread(QThread):
         super().__init__()
         self._run_flag = True
         self.model_path = config["face-mesh"]["model_path"]
-
         self.max_faces = config["face-mesh"]["initial_max_faces"]
-        # 读取初始的连线状态配置
-        self.left_draw_mode = config["face-mesh"].get("left_draw_mode", "mesh")
+        self.draw_mode = config["face-mesh"].get("draw_mode", "mesh")
+        self.draw_on_left = config["face-mesh"].get("draw_on_left", True)
+
         self.saturation = config["beauty"]["initial_saturation"]
         self.sharpness = config["beauty"]["initial_sharpness"]
         self.smoothing = config["beauty"]["initial_smoothing"]
@@ -50,9 +40,10 @@ class VideoThread(QThread):
         """
         if "max_faces" in params_dict:
             self.max_faces = params_dict["max_faces"]
-        # 新增对网格连线状态的解析
-        if "left_draw_mode" in params_dict:
-            self.left_draw_mode = params_dict["left_draw_mode"]
+        if "draw_mode" in params_dict:
+            self.draw_mode = params_dict["draw_mode"]
+        if "draw_on_left" in params_dict:
+            self.draw_on_left = params_dict["draw_on_left"]
         if "saturation" in params_dict:
             self.saturation = params_dict["saturation"]
         if "sharpness" in params_dict:
@@ -90,7 +81,8 @@ class VideoThread(QThread):
                     processed_frame, skeleton_img, _ = detector.find_face_mesh(
                         frame=beauty_frame,
                         draw=True,
-                        left_draw_mode=self.left_draw_mode,
+                        draw_mode=self.draw_mode,
+                        draw_on_left=self.draw_on_left,
                     )
 
                     dst = detector.img_combine(processed_frame, skeleton_img)
@@ -128,19 +120,18 @@ class ParameterPanel(QWidget):
 
         self.draw_mode_combo = QComboBox()
         self.draw_mode_combo.addItems(["绘制面部网络连接", "在人脸上绘制特征点"])
-        self.draw_mode_combo.setCurrentText(
-            "绘制面部网络连接"
-            if config["face-mesh"].get("initial_draw_tesselation", True)
-            else "在人脸上绘制特征点"
-        )
-
-        init_mode = config["face-mesh"].get("left_draw_mode", "mesh")
+        init_mode = config["face-mesh"].get("draw_mode", "mesh")
         if init_mode == "points":
             self.draw_mode_combo.setCurrentText("在人脸上绘制特征点")
         else:
             self.draw_mode_combo.setCurrentText("绘制面部网络连接")
         self.draw_mode_combo.currentTextChanged.connect(self.on_parameter_changed)
 
+        self.draw_on_left_checkbox = QCheckBox("在左侧(原图)上显示绘制内容")
+        self.draw_on_left_checkbox.setChecked(
+            config["face-mesh"].get("draw_on_left", True)
+        )
+        self.draw_on_left_checkbox.stateChanged.connect(self.on_parameter_changed)
         # 2. 饱和度调节滑块
         self.sat_slider = QSlider(Qt.Horizontal)
         self.sat_slider.setRange(0, 20)
@@ -172,7 +163,8 @@ class ParameterPanel(QWidget):
         self.bright_slider.valueChanged.connect(self.update_bright_label_and_emit)
 
         self.layout.addRow("最大识别脸数:", self.max_faces_combo)
-        self.layout.addRow("左侧原图显示:", self.draw_mode_combo)
+        self.layout.addRow("绘制模式选择:", self.draw_mode_combo)
+        self.layout.addRow(self.draw_on_left_checkbox)
         self.layout.addRow(self.sat_label, self.sat_slider)
         self.layout.addRow(self.sharp_label, self.sharp_slider)
         self.layout.addRow(self.smooth_label, self.smooth_slider)
@@ -208,14 +200,17 @@ class ParameterPanel(QWidget):
         self.on_parameter_changed()
 
     def on_parameter_changed(self):
-        """集中收集所有组件的数值, 打包为字典发送."""
-        # 解析下拉菜单的中文选项，映射为内部的英文模式控制符
+        """
+        方法级注释: 集中收集所有组件的数值, 打包为字典发送.
+        """
+        # 将中文选项映射为内部状态标识符
         mode_text = self.draw_mode_combo.currentText()
         draw_mode = "points" if mode_text == "在人脸上绘制特征点" else "mesh"
 
         params = {
             "max_faces": int(self.max_faces_combo.currentText()),
-            "left_draw_mode": draw_mode,
+            "draw_mode": draw_mode,
+            "draw_on_left": self.draw_on_left_checkbox.isChecked(),
             "saturation": self.sat_slider.value() / 10.0,
             "sharpness": self.sharp_slider.value() / 10.0,
             "smoothing": self.smooth_slider.value(),

@@ -56,14 +56,21 @@ class FaceMeshDetector:
         landmarker = vision.FaceLandmarker.create_from_options(options)
         return landmarker
 
-    def find_face_mesh(self, frame, draw: bool = True, left_draw_mode: str = "mesh"):
+    def find_face_mesh(
+        self,
+        frame,
+        draw: bool = True,
+        draw_mode: str = "mesh",
+        draw_on_left: bool = True,
+    ):
         """
         在一帧图像中寻找人脸网格, 并支持左侧图像模式的二选一.
 
         Args:
             frame: 输入的 BGR 格式图像.
             draw: 全局可视化开关.
-            left_draw_mode: 左侧原图的绘制模式 ("mesh" 为连线, "points" 为特征点).
+            draw_mode: 绘制模式 ("mesh" 为连线, "points" 为特征点).
+            draw_on_left: 是否在左侧原图上绘制.
         """
         frame_rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
         mediapipe_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
@@ -83,70 +90,72 @@ class FaceMeshDetector:
         if detection_result.face_landmarks and draw:
             for face_landmarks in detection_result.face_landmarks:
 
-                # 步骤一: 优先绘制所有的网格连线 (作为底层)
-                for (
-                    connection
-                ) in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION:
-                    start_index = connection.start
-                    end_index = connection.end
+                # 核心逻辑: 当全局模式为绘制网格连接时
+                if draw_mode == "mesh":
+                    for (
+                        connection
+                    ) in vision.FaceLandmarksConnections.FACE_LANDMARKS_TESSELATION:
+                        start_index = connection.start
+                        end_index = connection.end
 
-                    if start_index < len(face_landmarks) and end_index < len(
-                        face_landmarks
-                    ):
-                        start_landmark = face_landmarks[start_index]
-                        end_landmark = face_landmarks[end_index]
-                        h, w, _ = frame_shape
-                        start_point = (
-                            int(start_landmark.x * w),
-                            int(start_landmark.y * h),
-                        )
-                        end_point = (
-                            int(end_landmark.x * w),
-                            int(end_landmark.y * h),
-                        )
+                        if start_index < len(face_landmarks) and end_index < len(
+                            face_landmarks
+                        ):
+                            start_landmark = face_landmarks[start_index]
+                            end_landmark = face_landmarks[end_index]
+                            h, w, _ = frame_shape
+                            start_point = (
+                                int(start_landmark.x * w),
+                                int(start_landmark.y * h),
+                            )
+                            end_point = (
+                                int(end_landmark.x * w),
+                                int(end_landmark.y * h),
+                            )
 
-                        # 右侧骨架图: 始终无条件绘制绿色连线
-                        cv.line(
-                            img=skeleton_img,
-                            pt1=start_point,
-                            pt2=end_point,
-                            color=(0, 255, 0),
-                            thickness=1,
-                        )
-
-                        # 左侧原图: 仅当模式为 mesh 时才绘制连线
-                        if left_draw_mode == "mesh":
+                            # 右侧基准图: 始终无条件绘制绿色连线
                             cv.line(
-                                img=processed_frame,
+                                img=skeleton_img,
                                 pt1=start_point,
                                 pt2=end_point,
                                 color=(0, 255, 0),
                                 thickness=1,
                             )
 
-                # 步骤二: 随后绘制所有的特征点 (作为表层, 防止被绿线覆盖)
-                for landmark in face_landmarks:
-                    h, w, _ = frame_shape
-                    x, y = int(landmark.x * w), int(landmark.y * h)
+                            # 左侧原图: 仅当左侧开关开启时才绘制连线
+                            if draw_on_left:
+                                cv.line(
+                                    img=processed_frame,
+                                    pt1=start_point,
+                                    pt2=end_point,
+                                    color=(0, 255, 0),
+                                    thickness=1,
+                                )
 
-                    # 右侧骨架图: 始终无条件绘制红色特征点, 并且将半径调至 2, 确保在绿线上方清晰可见
-                    cv.circle(
-                        img=skeleton_img,
-                        center=(x, y),
-                        radius=2,
-                        color=(0, 0, 255),
-                        thickness=-1,
-                    )
+                # 核心逻辑: 当全局模式为绘制特征点时
+                elif draw_mode == "points":
+                    for landmark in face_landmarks:
+                        h, w, _ = frame_shape
+                        x, y = int(landmark.x * w), int(landmark.y * h)
 
-                    # 左侧原图: 仅当模式为 points 时才绘制特征点
-                    if left_draw_mode == "points":
+                        # 右侧基准图: 始终无条件绘制红色特征点 (为了可视性略微放大半径)
                         cv.circle(
-                            img=processed_frame,
+                            img=skeleton_img,
                             center=(x, y),
-                            radius=1,
+                            radius=2,
                             color=(0, 0, 255),
                             thickness=-1,
                         )
+
+                        # 左侧原图: 仅当左侧开关开启时才绘制特征点
+                        if draw_on_left:
+                            cv.circle(
+                                img=processed_frame,
+                                center=(x, y),
+                                radius=1,
+                                color=(0, 0, 255),
+                                thickness=-1,
+                            )
 
         return processed_frame, skeleton_img, detection_result.face_landmarks
 
