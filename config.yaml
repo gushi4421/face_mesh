@@ -9,6 +9,9 @@ gui:
     window_width: 1000
     window_height: 800
     initial_text: "Press 'Start' to open camera."
+    bg_image_path: "background.png" 
+    bg_opacity: 0.4       # 背景图片的初始透明度 (0.0 到 1.0)
+    video_opacity: 0.4   # 视频画面的初始透明度 (让背景能透出来)
 
 face-mesh:
     width: 640
@@ -16,8 +19,8 @@ face-mesh:
     print_landmarks: false
     model_path: "models/face_landmarker.task"
     initial_max_faces: 2
-    initial_draw_tesselation: true
-    left_draw_mode: "mesh"
+    draw_on_left: true
+    draw_mode: "mesh"
 
 beauty:
     initial_saturation: 1.0
