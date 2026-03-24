@@ -93,7 +93,16 @@ python app.py
 
 - **4.自定义参数设置**
 系统支持通过 `config.yaml` 文件进行全局参数配置，包括但不限于：
+- **5. 项目打包**
 
+如果为了追求极致的用户体验，可以将项目打包成独立的可执行文件
+``` bash
+# 安装打包工具
+pip install pyinstaller
+
+# 执行打包命令 (-D 生成目录模式，-w 隐藏控制台，指定应用名称)
+pyinstaller -D -w app.py --name "FaceMeshPro"
+```
 ## 👤 作者
 
 **gushi4421**
@@ -110,3 +119,5 @@ python app.py
 
 - 提交 [Issue](https://github.com/gushi4421/face_mesh/issues)
 - 发送邮件至：gushi4421@qq.com
+  
+⭐ 如果这个项目对你有帮助，欢迎 Star 支持！
