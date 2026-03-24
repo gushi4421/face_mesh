@@ -51,13 +51,13 @@ class VideoThread(QThread):
         """
         统一接收并更新来自前端面板的参数字典.
         """
-        # ... 其他参数保持不变 ...
         if "max_faces" in params_dict:
             self.max_faces = params_dict["max_faces"]
         # 新增对网格连线状态的解析
         if "draw_tesselation" in params_dict:
             self.draw_tesselation = params_dict["draw_tesselation"]
-        # ... 美颜参数保持不变 ...
+        if "draw_landmarks" in params_dict:
+            self.draw_landmarks = params_dict["draw_landmarks"]
         if "saturation" in params_dict:
             self.saturation = params_dict["saturation"]
         if "sharpness" in params_dict:
@@ -96,6 +96,7 @@ class VideoThread(QThread):
                         frame=beauty_frame,
                         draw=True,
                         draw_tesselation=self.draw_tesselation,
+                        draw_landmarks=self.draw_landmarks,
                     )
 
                     dst = detector.img_combine(processed_frame, skeleton_img)
@@ -120,24 +121,29 @@ class ParameterPanel(QWidget):
     sig_parameters_changed = pyqtSignal(dict)
 
     def __init__(self, config: dict):
-        """
-        构建包含多项控制的表单布局.
-        """
+        """构建包含多项控制的表单布局."""
         super().__init__()
         self.layout = QFormLayout(self)
 
-        # 1. 面部检测数量下拉菜单
         self.max_faces_combo = QComboBox()
         self.max_faces_combo.addItems(["1", "2", "3", "4", "5"])
         self.max_faces_combo.setCurrentText(
             str(config["face-mesh"]["initial_max_faces"])
         )
         self.max_faces_combo.currentTextChanged.connect(self.on_parameter_changed)
-        # 新增: 绘制连线的复选框控件
+
         self.draw_tesselation_checkbox = QCheckBox("绘制面部网格连线")
         self.draw_tesselation_checkbox.setChecked(
             config["face-mesh"].get("initial_draw_tesselation", True)
         )
+        self.draw_tesselation_checkbox.stateChanged.connect(self.on_parameter_changed)
+
+        # 新增: 控制特征点散点绘制的复选框控件
+        self.draw_landmarks_checkbox = QCheckBox("绘制面部特征点 (红点)")
+        self.draw_landmarks_checkbox.setChecked(
+            config["face-mesh"].get("initial_draw_landmarks", True)
+        )
+        self.draw_landmarks_checkbox.stateChanged.connect(self.on_parameter_changed)
         # 核心逻辑: 当复选框状态改变时, 触发全局数据收集
         self.draw_tesselation_checkbox.stateChanged.connect(self.on_parameter_changed)
         # 2. 饱和度调节滑块
@@ -175,8 +181,8 @@ class ParameterPanel(QWidget):
         self.layout.addRow(self.sharp_label, self.sharp_slider)
         self.layout.addRow(self.smooth_label, self.smooth_slider)
         self.layout.addRow(self.bright_label, self.bright_slider)
-        self.layout.addRow("最大识别脸数:", self.max_faces_combo)
         self.layout.addRow(self.draw_tesselation_checkbox)
+        self.layout.addRow(self.draw_landmarks_checkbox)
 
     def update_sat_label_and_emit(self, value: int):
         """
@@ -218,5 +224,6 @@ class ParameterPanel(QWidget):
             "sharpness": self.sharp_slider.value() / 10.0,
             "smoothing": self.smooth_slider.value(),
             "brighten": self.bright_slider.value() / 10.0,
+            "draw_landmarks": self.draw_landmarks_checkbox.isChecked(),
         }
         self.sig_parameters_changed.emit(params)
