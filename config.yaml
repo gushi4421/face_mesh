@@ -9,7 +9,7 @@ gui:
     window_width: 1100
     window_height: 800
     initial_text: "请点击“开始检测”开启摄像头"
-    bg_image_path: ""
+    bg_image_path: "background.png"
     bg_opacity: 0.6
 
 face-mesh:

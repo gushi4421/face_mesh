@@ -15,36 +15,53 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtCore import Qt, QSize
 import cv2 as cv
 
-
 from ui.widgets import BackgroundWidget, ParameterPanel
 from ui.thread import VideoThread
 
 
 class MainWindow(QMainWindow):
-    """UI 总控窗口."""
+    """UI 总控窗口.
+
+    Attributes:
+        config: 全局配置字典.
+        thread: 视频处理后台线程.
+    """
 
     def __init__(self, config: dict):
+        """初始化主窗口.
+
+        Args:
+            config: 全局配置字典.
+        """
         super().__init__()
         self.config = config
         self.setWindowTitle(config["gui"]["window_title"])
         self.resize(config["gui"]["window_width"], config["gui"]["window_height"])
 
+        # 初始化后台线程
         self.thread = VideoThread(config)
         self._init_ui()
         self._apply_qss()
 
     def _init_ui(self):
-        # 1. 容器
+        """构建自适应背景容器与双面板布局."""
+        # 1. 注入背景容器
         self.bg_container = BackgroundWidget(self)
         self.setCentralWidget(self.bg_container)
-        self.bg_container.set_background_image(self.config["gui"]["bg_image_path"])
+        self.bg_container.set_background_image(
+            self.config["gui"].get("bg_image_path", "")
+        )
+        self.bg_container.set_background_opacity(
+            self.config["gui"].get("bg_opacity", 0.6)
+        )
 
         main_layout = QHBoxLayout(self.bg_container)
 
-        # 2. 左侧显示
-        left_box = QGroupBox("实时监控")
+        # 2. 左侧视频展示区
+        left_box = QGroupBox("实时监控 (带全套美颜处理)")
         left_box.setObjectName("videoGroup")
         left_v = QVBoxLayout(left_box)
+
         self.vid_lbl = QLabel(self.config["gui"]["initial_text"])
         self.vid_lbl.setAlignment(Qt.AlignCenter)
         self.vid_lbl.setMinimumSize(QSize(640, 480))
@@ -55,17 +72,20 @@ class MainWindow(QMainWindow):
         self.stop_btn = QPushButton("停止检测")
         self.start_btn.clicked.connect(self._start)
         self.stop_btn.clicked.connect(self._stop)
+        self.stop_btn.setEnabled(False)
         btn_h.addWidget(self.start_btn)
         btn_h.addWidget(self.stop_btn)
         left_v.addLayout(btn_h)
 
         main_layout.addWidget(left_box, 4)
 
-        # 3. 右侧面板
+        # 3. 右侧参数控制面板
         right_box = QGroupBox("控制台")
         right_box.setObjectName("paramGroup")
         right_v = QVBoxLayout(right_box)
+
         self.panel = ParameterPanel(self.config)
+        # 绑定信号：当 UI 参数改变时触发 _on_params
         self.panel.sig_parameters_changed.connect(self._on_params)
         right_v.addWidget(self.panel)
         right_v.addStretch()
@@ -73,34 +93,63 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(right_box, 1)
 
     def _apply_qss(self):
-        """注入高对比度 QSS 样式."""
+        """注入样式表，确保背景透视与文字对比度."""
         qss = """
-        QGroupBox { border: 1px solid rgba(255,255,255,60); border-radius: 8px; color: white; font-weight: bold; font-size: 18px; margin-top: 20px; }
+        QGroupBox { 
+            border: 1px solid rgba(255,255,255,60); 
+            border-radius: 8px; 
+            color: white; 
+            font-weight: bold; 
+            font-size: 18px; 
+            margin-top: 20px; 
+        }
         QGroupBox#paramGroup { background-color: rgba(20,20,20,180); }
+        /* 关键：确保视频区域 QLabel 背景透明，以透出底层的背景图 */
         QGroupBox#videoGroup QLabel { background-color: transparent; }
         QLabel, QCheckBox { color: white; font-size: 15px; }
-        QPushButton { background-color: #444; color: white; padding: 8px; border-radius: 4px; }
+        QPushButton { 
+            background-color: rgba(60,60,60,200); 
+            color: white; 
+            padding: 8px; 
+            border-radius: 4px; 
+        }
+        QPushButton:hover { background-color: rgba(90,90,90,220); }
         """
         self.setStyleSheet(qss)
 
     def _on_params(self, data: dict):
-        """拦截 UI 样式，透传业务参数."""
+        """接收 UI 信号并分发参数.
+
+        Args:
+            data: 包含所有 UI 控件当前状态的字典.
+        """
+        # 更新 UI 层的背景显示
         self.bg_container.set_background_image(data["bg_image_path"])
         self.bg_container.set_background_opacity(data["bg_opacity"])
-        self.thread.update_params(data)
+
+        # 修正处：调用线程中正确的方法名 update_parameters
+        self.thread.update_parameters(data)
 
     def _start(self):
+        """开启摄像头线程."""
         self.thread.frame_signal.connect(self._update_img)
         self.thread.start()
+        self.start_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.vid_lbl.setText("")
 
     def _stop(self):
+        """停止线程并重置 UI 占位."""
         self.thread.stop()
+        self.start_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
         self.vid_lbl.clear()
         self.vid_lbl.setText("检测已停止")
 
     def _update_img(self, img):
+        """渲染后台传回的 4 通道图像."""
         h, w, ch = img.shape
-        # 兼容 4 通道 RGBA 渲染
+        # 针对 4 通道 BGRA 图像进行特殊处理
         fmt = QImage.Format_RGBA8888 if ch == 4 else QImage.Format_RGB888
         if ch == 4:
             img = cv.cvtColor(img, cv.COLOR_BGRA2RGBA)
@@ -115,5 +164,6 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
+        """拦截窗口关闭事件，确保资源安全释放."""
         self._stop()
         event.accept()

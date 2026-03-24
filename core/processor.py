@@ -1,6 +1,6 @@
-"""该模块封装了所有针对单帧图像的美颜与滤镜算法.
+"""该模块封装了所有图像后处理与美颜特效算法.
 
-包含饱和度、锐化、磨皮及美白处理逻辑.
+包含饱和度、锐化、磨皮及美白处理的核心计算逻辑.
 """
 
 import cv2 as cv
@@ -8,11 +8,11 @@ import numpy as np
 
 
 class ImageProcessor:
-    """提供图像后处理滤镜的类."""
+    """提供图像滤镜处理功能的静态类."""
 
     @staticmethod
     def adjust_saturation(image: np.ndarray, scale: float) -> np.ndarray:
-        """调整 BGR 图像的饱和度."""
+        """调整图像饱和度."""
         if scale == 1.0:
             return image
         hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV).astype(np.float32)
@@ -22,7 +22,7 @@ class ImageProcessor:
 
     @staticmethod
     def apply_sharpening(image: np.ndarray, intensity: float) -> np.ndarray:
-        """通过拉普拉斯算子对图像进行锐化."""
+        """应用动态锐化滤镜."""
         if intensity == 0.0:
             return image
         kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
@@ -40,7 +40,7 @@ class ImageProcessor:
 
     @staticmethod
     def apply_skin_brightening(image: np.ndarray, gamma: float) -> np.ndarray:
-        """使用 LUT 查表法实现 Gamma 亮度校正."""
+        """使用 Gamma 校正实现美白."""
         if gamma == 1.0:
             return image
         inv_gamma = 1.0 / gamma
@@ -48,3 +48,21 @@ class ImageProcessor:
             "uint8"
         )
         return cv.LUT(image, table)
+
+    @classmethod
+    def apply_all_filters(cls, image: np.ndarray, params: dict) -> np.ndarray:
+        """一键应用所有美颜参数.
+
+        Args:
+            image: 输入的 BGR 图像.
+            params: 包含各种强度参数的字典.
+
+        Returns:
+            处理后的图像.
+        """
+        # 按照工业标准顺序进行滤镜叠加
+        img = cls.apply_skin_smoothing(image, params.get("smoothing", 0))
+        img = cls.apply_skin_brightening(img, params.get("brighten", 1.0))
+        img = cls.adjust_saturation(img, params.get("saturation", 1.0))
+        img = cls.apply_sharpening(img, params.get("sharpness", 0.0))
+        return img

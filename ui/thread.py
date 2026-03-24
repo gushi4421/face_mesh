@@ -1,6 +1,6 @@
-"""该模块封装视频处理线程.
+"""该模块负责后台视频流的采集与处理线程.
 
-作为中间桥梁，连接 core 算法层与 ui 呈现层.
+作为中间件，将核心算法应用到摄像头捕获的每一帧，并推送到 UI 层.
 """
 
 import cv2 as cv
@@ -12,7 +12,7 @@ from utils.camera_utils import open_camera
 
 
 class VideoThread(QThread):
-    """后台线程，执行摄像头捕获、美颜与人脸检测."""
+    """执行“捕获-处理-渲染”闭环的后台线程."""
 
     frame_signal = pyqtSignal(np.ndarray)
 
@@ -20,39 +20,45 @@ class VideoThread(QThread):
         super().__init__()
         self.cfg = config
         self.running = True
+        # 初始化完整的业务参数
         self.params = {
-            "max_faces": config["face-mesh"]["initial_max_faces"],
-            "draw_mode": config["face-mesh"]["draw_mode"],
-            "draw_on_left": config["face-mesh"]["draw_on_left"],
+            "draw_mode": "mesh",
+            "draw_on_left": True,
+            "saturation": 1.0,
+            "sharpness": 0.0,
             "smoothing": 0,
+            "brighten": 1.0,
         }
 
-    def update_params(self, new_params: dict):
-        """更新线程内的运行参数."""
+    def update_parameters(self, new_params: dict):
+        """实时更新线程内的运行参数."""
         self.params.update(new_params)
 
     def run(self):
-        """线程主循环."""
+        """线程执行入口."""
         cap = open_camera()
-        detector = FaceMeshDetector(self.cfg["face-mesh"]["model_path"], 5)
+        detector = FaceMeshDetector(self.cfg["face-mesh"]["model_path"], 2)
 
         while self.running:
             ret, frame = cap.read()
             if not ret:
                 break
+
+            # 1. 预处理：镜像翻转
             frame = cv.flip(frame, 1)
 
-            # 1. 美颜
-            frame = ImageProcessor.apply_skin_smoothing(frame, self.params["smoothing"])
+            # 2. 核心算法：应用全套美颜滤镜
+            # 调用封装好的静态方法，保持代码整洁
+            beauty_frame = ImageProcessor.apply_all_filters(frame, self.params)
 
-            # 2. 检测
+            # 3. 核心算法：应用 MediaPipe 检测与 4 通道渲染
             left, right = detector.find_face_mesh(
-                frame,
+                beauty_frame,
                 draw_mode=self.params["draw_mode"],
                 draw_on_left=self.params["draw_on_left"],
             )
 
-            # 3. 拼接并发送 (hstack 会保留 4 通道)
+            # 4. 拼接并推送到主界面 (保持 4 通道)
             combined = np.hstack((left, right))
             self.frame_signal.emit(combined)
 
