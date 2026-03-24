@@ -1,24 +1,26 @@
 logging:
-    # 日志级别: DEBUG, INFO, WARNING, ERROR, CRITICAL
     level: "INFO"
-    
-    # 日志文件路径
     path: "records.log"
-    
-    # 日志格式
     format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
-    # 日志文件编码
     encoding: "utf-8"
 
+gui:
+    window_title: "Face Mesh Pro - Modular & Beauty"
+    window_width: 1000
+    window_height: 800
+    initial_text: "Press 'Start' to open camera."
+
 face-mesh:
-    # 
     width: 640
-
     height: 480
-
     print_landmarks: false
+    model_path: "models/face_landmarker.task"
+    initial_max_faces: 2
+    initial_draw_tesselation: true
+    initial_draw_landmarks: true
 
-    model_path: "face_landmarker.task"
-
-    maxfaces: 2
+beauty:
+    initial_saturation: 1.0
+    initial_sharpness: 0.0
+    initial_smoothing: 0
+    initial_brighten: 1.0
