@@ -1,6 +1,6 @@
 """该模块定义主窗口 UI.
 
-负责整体布局、QSS 样式注入及信号的分发.
+负责整体布局, QSS 样式注入及信号的分发.
 """
 
 from PyQt5.QtWidgets import (
@@ -85,7 +85,7 @@ class MainWindow(QMainWindow):
         right_v = QVBoxLayout(right_box)
 
         self.panel = ParameterPanel(self.config)
-        # 绑定信号：当 UI 参数改变时触发 _on_params
+        # 绑定信号: 当 UI 参数改变时触发 _on_params
         self.panel.sig_parameters_changed.connect(self._on_params)
         right_v.addWidget(self.panel)
         right_v.addStretch()
@@ -93,27 +93,40 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(right_box, 1)
 
     def _apply_qss(self):
-        """注入样式表，确保背景透视与文字对比度."""
+        """注入样式表, 确保背景透视与文字对比度."""
         qss = """
+        /* 基础 GroupBox 样式 */
         QGroupBox { 
-            border: 1px solid rgba(255,255,255,60); 
+            border: 1px solid rgba(255, 255, 255, 60); 
             border-radius: 8px; 
-            color: white; 
+            color: #FFFFFF; 
             font-weight: bold; 
-            font-size: 18px; 
-            margin-top: 20px; 
+            font-size: 20px; /* 核心修改: 将标题字号放大至 20px */
+            margin-top: 25px; /* 核心修改: 顶部留出足够的外边距, 防止大字号被裁切 */
         }
-        QGroupBox#paramGroup { background-color: rgba(20,20,20,180); }
-        /* 关键：确保视频区域 QLabel 背景透明，以透出底层的背景图 */
+        
+        /* 核心修改: 精准控制标题文字的位置, 让它居中卡在边框上 */
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top center; /* 绝对顶部居中对齐 */
+            padding: 0 15px; /* 左右增加内边距, 打断边框线, 让文字两端有呼吸感 */
+            color: #FFFFFF;
+        }
+
+        QGroupBox#paramGroup { background-color: rgba(20, 20, 20, 180); }
+        /* 关键: 确保视频区域 QLabel 背景透明, 以透出底层的背景图 */
         QGroupBox#videoGroup QLabel { background-color: transparent; }
-        QLabel, QCheckBox { color: white; font-size: 15px; }
-        QPushButton { 
-            background-color: rgba(60,60,60,200); 
-            color: white; 
+        
+        QLabel, QCheckBox { color: #FFFFFF; font-size: 15px; }
+        QPushButton, QComboBox { 
+            background-color: rgba(60, 60, 60, 200); 
+            color: #FFFFFF; 
             padding: 8px; 
             border-radius: 4px; 
+            font-size: 15px;
         }
-        QPushButton:hover { background-color: rgba(90,90,90,220); }
+        QPushButton:hover { background-color: rgba(90, 90, 90, 220); }
+        QPushButton:disabled { color: #888888; background-color: rgba(40, 40, 40, 100); }
         """
         self.setStyleSheet(qss)
 
@@ -127,7 +140,7 @@ class MainWindow(QMainWindow):
         self.bg_container.set_background_image(data["bg_image_path"])
         self.bg_container.set_background_opacity(data["bg_opacity"])
 
-        # 修正处：调用线程中正确的方法名 update_parameters
+        # 传递业务参数给线程
         self.thread.update_parameters(data)
 
     def _start(self):
@@ -164,6 +177,6 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
-        """拦截窗口关闭事件，确保资源安全释放."""
+        """拦截窗口关闭事件, 确保资源安全释放."""
         self._stop()
         event.accept()
