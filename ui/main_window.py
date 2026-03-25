@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         self.bg_container.set_background_opacity(
             self.config["gui"].get("bg_opacity", 0.6)
         )
-
+        self.thread.frame_signal.connect(self._update_img)
         main_layout = QHBoxLayout(self.bg_container)
 
         # 2. 左侧视频展示区
@@ -152,12 +152,16 @@ class MainWindow(QMainWindow):
             
     def _start(self):
         """开启摄像头线程."""
-        self.thread.frame_signal.connect(self._update_img)
+        if self.thread.params["source_mode"] == "image":
+            self.stop_btn.setEnabled(False)
+            self.start_btn.setEnabled(True)
+        else:
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.vid_lbl.setText("")
+            
         self.thread.start()
-        self.start_btn.setEnabled(False)
-        self.stop_btn.setEnabled(True)
-        self.vid_lbl.setText("")
-
+        
     def _stop(self):
         """停止线程并重置 UI 占位."""
         self.thread.stop()

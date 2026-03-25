@@ -84,6 +84,8 @@ class ParameterPanel(QWidget):
     def _init_ui(self):
         """构建控件布局."""
         layout = QFormLayout(self)
+        layout.setVerticalSpacing(20) 
+        layout.setContentsMargins(15, 20, 15, 20)
 
         # --- 1. 检测配置 ---
 
@@ -175,8 +177,6 @@ class ParameterPanel(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, "选择待检测图片", "", "Images (*.png *.jpg *.jpeg *.bmp)")
         if path:
             self.image_src_path = path
-            QMessageBox.information(self, "导入成功", f"已选择图片检测源:\n{os.path.basename(path)}")
-            # 切换模式并通知
             self.source_mode_combo.setCurrentText("静态图片文件")
             self.sig_source_file_changed.emit("image", path)
             self._emit()
@@ -186,8 +186,6 @@ class ParameterPanel(QWidget):
         path, _ = QFileDialog.getOpenFileName(self, "选择待检测视频", "", "Videos (*.mp4 *.avi *.mkv *.mov)")
         if path:
             self.video_src_path = path
-            QMessageBox.information(self, "导入成功", f"已选择视频检测源:\n{os.path.basename(path)}")
-            # 切换模式并通知
             self.source_mode_combo.setCurrentText("本地视频文件")
             self.sig_source_file_changed.emit("video", path)
             self._emit()
@@ -201,19 +199,22 @@ class ParameterPanel(QWidget):
         self.sat_lbl.setText(f"饱和度: {self.sat_sld.value() / 10.0}")
         self.sharp_lbl.setText(f"锐化强度: {self.sharp_sld.value() / 10.0}")
 
+        mode_text = self.source_mode_combo.currentText()
+        if "图片" in mode_text: source_mode = "image"
+        elif "视频" in mode_text: source_mode = "video"
+        else: source_mode = "camera"
         data = {
+            "source_mode": source_mode,
+            "image_src_path": self.image_src_path,
+            "video_src_path": self.video_src_path,
             "max_faces": int(self.faces_combo.currentText()),
-            "draw_mode": (
-                "points"
-                if self.mode_combo.currentText() == "在人脸上绘制特征点"
-                else "mesh"
-            ),
+            "draw_mode": "points" if self.mode_combo.currentText() == "在人脸上绘制特征点" else "mesh",
             "draw_on_left": self.left_cb.isChecked(),
             "bg_image_path": self.bg_path,
             "bg_opacity": self.bg_op_sld.value() / 100.0,
             "smoothing": self.smooth_sld.value(),
             "brighten": self.bright_sld.value() / 10.0,
             "saturation": self.sat_sld.value() / 10.0,
-            "sharpness": self.sharp_sld.value() / 10.0,
+            "sharpness": self.sharp_sld.value() / 10.0
         }
         self.sig_parameters_changed.emit(data)
