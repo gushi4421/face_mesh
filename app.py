@@ -6,6 +6,7 @@
 
 import sys
 from PyQt5.QtWidgets import QApplication
+
 from ui.main_window import MainWindow
 from utils.config_loader import load_config
 from utils.logger import logger

@@ -83,6 +83,7 @@ class MainWindow(QMainWindow):
         self.panel = ParameterPanel(self.config)
         # 绑定信号: 当 UI 参数改变时触发 _on_params
         self.panel.sig_parameters_changed.connect(self._on_params)
+        self.panel.sig_source_file_changed.connect(self._on_source_file_changed)
         right_v.addWidget(self.panel)
         right_v.addStretch()
 
@@ -139,6 +140,16 @@ class MainWindow(QMainWindow):
         # 传递业务参数给线程
         self.thread.update_parameters(data)
 
+    def _on_source_file_changed(self, file_type: str, file_path: str):
+        """
+        如果是静态图片，自动触发单次检测展示。
+        """
+        if file_type == "image":
+            self._stop() # 停止当前可能运行的摄像头/视频流
+            self._start() # 启动线程处理单张图片
+        elif file_type == "video":
+            self._stop() # 视频模式需要用户手动点击开始
+            
     def _start(self):
         """开启摄像头线程."""
         self.thread.frame_signal.connect(self._update_img)

@@ -6,15 +6,8 @@
 
 import os
 from PyQt5.QtWidgets import (
-    QWidget,
-    QFormLayout,
-    QComboBox,
-    QSlider,
-    QLabel,
-    QCheckBox,
-    QPushButton,
-    QFileDialog,
-    QHBoxLayout,
+    QWidget, QFormLayout, QComboBox, QSlider, QLabel, 
+    QCheckBox, QPushButton, QFileDialog, QHBoxLayout, QMessageBox
 )
 from PyQt5.QtGui import QPainter, QPixmap
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -73,6 +66,7 @@ class ParameterPanel(QWidget):
     """侧边控制面板, 封装所有检测与美颜控制项."""
 
     sig_parameters_changed = pyqtSignal(dict)
+    sig_source_file_changed = pyqtSignal(str, str)
 
     def __init__(self, config: dict):
         """初始化面板.
@@ -83,6 +77,8 @@ class ParameterPanel(QWidget):
         super().__init__()
         self.config = config
         self.bg_path = config["gui"].get("bg_image_path", "")
+        self.image_src_path = ""
+        self.video_src_path = ""
         self._init_ui()
 
     def _init_ui(self):
@@ -90,6 +86,20 @@ class ParameterPanel(QWidget):
         layout = QFormLayout(self)
 
         # --- 1. 检测配置 ---
+
+        # 数据源模式选择
+        self.source_mode_combo = QComboBox()
+        self.source_mode_combo.addItems(["实时摄像头", "静态图片文件", "本地视频文件"])
+        self.source_mode_combo.currentIndexChanged.connect(self._emit)
+        
+        # 图片导入按钮
+        self.import_img_btn = QPushButton("导入图片...")
+        self.import_img_btn.clicked.connect(self._pick_image_source)
+        
+        # 视频导入按钮
+        self.import_vid_btn = QPushButton("导入视频...")
+        self.import_vid_btn.clicked.connect(self._pick_video_source)
+
         self.faces_combo = QComboBox()
         self.faces_combo.addItems(["1", "2", "3", "4", "5"])
         init_faces = self.config["face-mesh"].get("initial_max_faces", 2)
@@ -106,7 +116,7 @@ class ParameterPanel(QWidget):
 
         # --- 2. 全局背景控制 ---
         self.bg_btn = QPushButton("浏览选图...")
-        self.bg_btn.clicked.connect(self._pick_file)
+        self.bg_btn.clicked.connect(self._pick_bg_file)
         init_bg_op = int(self.config["gui"].get("bg_opacity", 0.6) * 100)
         self.bg_op_sld, self.bg_op_lbl = self._create_slider(
             0, 100, init_bg_op, f"背景透明度: {init_bg_op}%"
@@ -121,6 +131,9 @@ class ParameterPanel(QWidget):
         self.sharp_sld, self.sharp_lbl = self._create_slider(0, 10, 0, "锐化强度: 0.0")
 
         # 将所有控件加入表单
+        layout.addRow("数据源模式:", self.source_mode_combo)
+        layout.addRow("图片检测源:", self.import_img_btn)
+        layout.addRow("视频检测源:", self.import_vid_btn)
         layout.addRow("最大识别脸数:", self.faces_combo)
         layout.addRow("绘制模式选择:", self.mode_combo)
         layout.addRow(self.left_cb)
@@ -150,13 +163,33 @@ class ParameterPanel(QWidget):
         lbl = QLabel(label_text)
         return sld, lbl
 
-    def _pick_file(self):
-        """打开文件对话框选择图片."""
-        path, _ = QFileDialog.getOpenFileName(
-            self, "选择图片", "", "Images (*.png *.jpg *.bmp)"
-        )
+    def _pick_bg_file(self):
+        """导入 UI 背景图片."""
+        path, _ = QFileDialog.getOpenFileName(self, "选择背景图片", "", "Images (*.png *.jpg *.bmp)")
         if path:
             self.bg_path = path
+            self._emit()
+
+    def _pick_image_source(self):
+        """导入静态图片检测源."""
+        path, _ = QFileDialog.getOpenFileName(self, "选择待检测图片", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        if path:
+            self.image_src_path = path
+            QMessageBox.information(self, "导入成功", f"已选择图片检测源:\n{os.path.basename(path)}")
+            # 切换模式并通知
+            self.source_mode_combo.setCurrentText("静态图片文件")
+            self.sig_source_file_changed.emit("image", path)
+            self._emit()
+
+    def _pick_video_source(self):
+        """导入本地视频检测源."""
+        path, _ = QFileDialog.getOpenFileName(self, "选择待检测视频", "", "Videos (*.mp4 *.avi *.mkv *.mov)")
+        if path:
+            self.video_src_path = path
+            QMessageBox.information(self, "导入成功", f"已选择视频检测源:\n{os.path.basename(path)}")
+            # 切换模式并通知
+            self.source_mode_combo.setCurrentText("本地视频文件")
+            self.sig_source_file_changed.emit("video", path)
             self._emit()
 
     def _emit(self):
