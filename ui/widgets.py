@@ -107,8 +107,6 @@ class ParameterPanel(QWidget):
         # --- 2. 全局背景控制 ---
         self.bg_btn = QPushButton("浏览选图...")
         self.bg_btn.clicked.connect(self._pick_file)
-
-        # 核心修复: 为透明度滑块分配动态标签
         init_bg_op = int(self.config["gui"].get("bg_opacity", 0.6) * 100)
         self.bg_op_sld, self.bg_op_lbl = self._create_slider(
             0, 100, init_bg_op, f"背景透明度: {init_bg_op}%"
@@ -127,10 +125,7 @@ class ParameterPanel(QWidget):
         layout.addRow("绘制模式选择:", self.mode_combo)
         layout.addRow(self.left_cb)
         layout.addRow("全局 UI 背景:", self.bg_btn)
-
-        # 核心修复: 将原先的静态字符串替换为动态标签对象
         layout.addRow(self.bg_op_lbl, self.bg_op_sld)
-
         layout.addRow(self.smooth_lbl, self.smooth_sld)
         layout.addRow(self.bright_lbl, self.bright_sld)
         layout.addRow(self.sat_lbl, self.sat_sld)

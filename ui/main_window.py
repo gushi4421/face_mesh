@@ -21,12 +21,7 @@ from ui.thread import VideoThread
 
 
 class MainWindow(QMainWindow):
-    """UI 总控窗口.
-
-    Attributes:
-        config: 全局配置字典.
-        thread: 视频处理后台线程.
-    """
+    """UI 总控窗口"""
 
     def __init__(self, config: dict):
         """初始化主窗口.
@@ -102,8 +97,8 @@ class MainWindow(QMainWindow):
             border-radius: 8px; 
             color: #FFFFFF; 
             font-weight: bold; 
-            font-size: 24px; /* 核心修改: 将标题字号放大至 24px */
-            margin-top: 25px; /* 核心修改: 顶部留出足够的外边距, 防止大字号被裁切 */
+            font-size: 24px; 
+            margin-top: 25px; 
         }
         
         /* 核心修改: 精准控制标题文字的位置, 让它居中卡在边框上 */
