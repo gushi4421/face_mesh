@@ -87,7 +87,6 @@ class VideoThread(QThread):
                 logger.error(f"解析静态图片失败: {img_path}")
                 return
                 
-            # 执行单次管线推理
             beauty_frame = ImageProcessor.apply_all_filters(frame, self.params)
             left, right = detector.find_face_mesh(
                 beauty_frame, draw_mode=self.params['draw_mode'],

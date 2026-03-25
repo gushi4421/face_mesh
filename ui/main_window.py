@@ -136,9 +136,10 @@ class MainWindow(QMainWindow):
         # 更新 UI 层的背景显示
         self.bg_container.set_background_image(data["bg_image_path"])
         self.bg_container.set_background_opacity(data["bg_opacity"])
-
-        # 传递业务参数给线程
         self.thread.update_parameters(data)
+        if data["source_mode"] == "image" and data["image_src_path"]:
+            self._stop()  
+            self._start()
 
     def _on_source_file_changed(self, file_type: str, file_path: str):
         """
@@ -161,7 +162,7 @@ class MainWindow(QMainWindow):
             self.vid_lbl.setText("")
             
         self.thread.start()
-        
+
     def _stop(self):
         """停止线程并重置 UI 占位."""
         self.thread.stop()
