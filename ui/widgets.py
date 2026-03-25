@@ -1,4 +1,5 @@
-"""该模块提供 GUI 的自定义交互组件.
+"""
+该模块提供 GUI 的自定义交互组件.
 
 包含实现背景渲染的 BackgroundWidget 和交互控制的 ParameterPanel.
 """
