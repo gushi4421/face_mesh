@@ -1,4 +1,5 @@
-"""该模块封装了所有图像后处理与美颜特效算法.
+"""
+该模块封装了所有图像后处理与美颜特效算法.
 
 包含饱和度、锐化、磨皮及美白处理的核心计算逻辑.
 """
@@ -12,27 +13,54 @@ class ImageProcessor:
 
     @staticmethod
     def adjust_saturation(image: np.ndarray, scale: float) -> np.ndarray:
-        """调整图像饱和度."""
+        """调整图像饱和度.
+        
+        Args:
+            image: 输入的 BGR 图像
+            scale: 饱和度缩放倍数
+        
+        Returns:
+            处理后的 BGR 图像
+        """
         if scale == 1.0:
             return image
+        # 将 BGR 转换为 HSV 提取饱和度通道
         hsv = cv.cvtColor(image, cv.COLOR_BGR2HSV).astype(np.float32)
+        # 对通道 S 进行线性缩放
         hsv[:, :, 1] *= scale
+        # 限制像素值在 0-255 之间
         hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 255)
+        # 返回转换后的 BGR 
         return cv.cvtColor(hsv.astype(np.uint8), cv.COLOR_HSV2BGR)
 
     @staticmethod
     def apply_sharpening(image: np.ndarray, intensity: float) -> np.ndarray:
-        """应用动态锐化滤镜."""
+        """应用动态锐化滤镜.
+        
+        Args:
+            image: 输入的图像
+            intensity: 锐化强度
+        Returns:
+            处理后的图像
+        """
         if intensity == 0.0:
             return image
+        # 定义锐化算子
         kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+        # 定义恒等算子
         id_kernel = np.array([[0, 0, 0], [0, 1, 0], [0, 0, 0]], dtype=np.float32)
+        # 根据锐化强度生成卷积核
         dyn_kernel = id_kernel + intensity * (kernel - id_kernel)
         return cv.filter2D(image, -1, dyn_kernel)
 
     @staticmethod
     def apply_skin_smoothing(image: np.ndarray, intensity: int) -> np.ndarray:
-        """使用双边滤波实现磨皮."""
+        """使用双边滤波实现磨皮.
+        
+        Args:
+            image: 输入的图像
+            intensity: 磨皮强度
+        """
         if intensity <= 0:
             return image
         d = int(intensity / 10) + 5
@@ -40,7 +68,12 @@ class ImageProcessor:
 
     @staticmethod
     def apply_skin_brightening(image: np.ndarray, gamma: float) -> np.ndarray:
-        """使用 Gamma 校正实现美白."""
+        """使用 Gamma 校正实现美白.
+        
+        Args:
+            image: 输入的图像
+            gamma: 校正系数
+        """
         if gamma == 1.0:
             return image
         inv_gamma = 1.0 / gamma
@@ -60,7 +93,6 @@ class ImageProcessor:
         Returns:
             处理后的图像.
         """
-        # 按照工业标准顺序进行滤镜叠加
         img = cls.apply_skin_smoothing(image, params.get("smoothing", 0))
         img = cls.apply_skin_brightening(img, params.get("brighten", 1.0))
         img = cls.adjust_saturation(img, params.get("saturation", 1.0))

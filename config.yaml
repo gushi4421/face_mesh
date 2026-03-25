@@ -1,25 +1,43 @@
 logging:
+    # 日志级别
     level: "INFO"
+    # 日志记录文件
     path: "records.log"
+    # 日志记录格式
     format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    # 日志编码
     encoding: "utf-8"
 
 gui:
-    window_title: "Face Mesh Pro - Ultimate Refactored"
+    # 程序窗口名称
+    window_title: "Face Mesh - Ultimate Refactored"
+    # 窗口宽度
     window_width: 1100
+    # 窗口高度
     window_height: 800
+    # 显示的text文本
     initial_text: "请点击“开始检测”开启摄像头"
+    # 默认背景路径
     bg_image_path: ""
+    # 默认背景透明度
     bg_opacity: 0.6
 
 face-mesh:
+    # 加载 task 文件路径
     model_path: "models/face_landmarker.task"
+    # 默认最大识别脸数
     initial_max_faces: 2
+    # 默认绘制模式
     draw_mode: "mesh"      # "mesh" 或 "points"
+    # 在左侧窗口默认绘制
     draw_on_left: true
 
 beauty:
+    # 饱和度
     initial_saturation: 1.0
+    # 锐度
     initial_sharpness: 0.0
+    # 磨皮
     initial_smoothing: 0
+    # 美白
     initial_brighten: 1.0
